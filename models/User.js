@@ -35,15 +35,15 @@ const userSchema = new mongoose.Schema({
   address: {
     street: {
       type: String,
-      required: [true, 'L\'adresse est requise']
+      required: [false, 'L\'adresse est requise']
     },
     city: {
       type: String,
-      required: [true, 'La ville est requise']
+      required: [false, 'La ville est requise']
     },
     postalCode: {
       type: String,
-      required: [true, 'Le code postal est requis']
+      required: [false, 'Le code postal est requis']
     },
     country: {
       type: String,
@@ -52,16 +52,16 @@ const userSchema = new mongoose.Schema({
   },
   dateOfBirth: {
     type: Date,
-    required: [true, 'La date de naissance est requise']
+    required: [false, 'La date de naissance est requise']
   },
   drivingLicense: {
     number: {
       type: String,
-      required: [true, 'Le numéro de permis de conduire est requis']
+      required: [false, 'Le numéro de permis de conduire est requis']
     },
     expiryDate: {
       type: Date,
-      required: [true, 'La date d\'expiration du permis est requise']
+      required: [false, 'La date d\'expiration du permis est requise']
     },
     category: {
       type: String,

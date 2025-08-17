@@ -73,7 +73,7 @@ router.get('/:id', auth, async (req, res) => {
 // @access  Private
 router.post('/', [
   auth,
-  body('vehicle').isMongoId().withMessage('Véhicule invalide'),
+  body('vehicle').optional().isMongoId().withMessage('Véhicule invalide'),
   body('service').optional().isMongoId().withMessage('Service invalide'),
   body('startDate').isISO8601().withMessage('Date de début invalide'),
   body('endDate').isISO8601().withMessage('Date de fin invalide'),
@@ -102,14 +102,22 @@ router.post('/', [
       payment
     } = req.body;
 
-    // Vérifier que le véhicule existe et est disponible
-    const vehicle = await Vehicle.findById(vehicleId);
-    if (!vehicle) {
-      return res.status(404).json({ message: 'Véhicule non trouvé' });
+    // Vérifier qu'au moins un véhicule ou un service est fourni
+    if (!vehicleId && !serviceId) {
+      return res.status(400).json({ message: 'Un véhicule ou un service doit être fourni' });
     }
 
-    if (!vehicle.isAvailableForDates(new Date(startDate), new Date(endDate))) {
-      return res.status(400).json({ message: 'Véhicule non disponible pour ces dates' });
+    // Vérifier que le véhicule existe et est disponible si fourni
+    let vehicle = null;
+    if (vehicleId) {
+      vehicle = await Vehicle.findById(vehicleId);
+      if (!vehicle) {
+        return res.status(404).json({ message: 'Véhicule non trouvé' });
+      }
+
+      if (!vehicle.isAvailableForDates(new Date(startDate), new Date(endDate))) {
+        return res.status(400).json({ message: 'Véhicule non disponible pour ces dates' });
+      }
     }
 
     // Vérifier que le service existe si fourni
@@ -123,16 +131,51 @@ router.post('/', [
 
     // Calculer les prix
     const totalDays = Math.ceil((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24));
-    const dailyRate = vehicle.pricing.dailyRate;
-    const subtotal = totalDays * dailyRate;
-    const insurance = options?.insurance ? totalDays * vehicle.pricing.insurance : 0;
-    const totalAmount = subtotal + insurance;
+    
+    let subtotal = 0;
+    let dailyRate = 0;
+    let deposit = 0;
+    
+    // Calculer le prix de base selon le type (véhicule ou service)
+    if (vehicleId) {
+      // Réservation de véhicule
+      dailyRate = vehicle.pricing.dailyRate;
+      subtotal = totalDays * dailyRate;
+      deposit = vehicle.pricing.deposit;
+    } else if (serviceId) {
+      // Réservation de service
+      dailyRate = service.price;
+      subtotal = totalDays * service.price;
+      deposit = 0; // Pas de dépôt pour les services
+    }
+    
+    // Calculer le prix de toutes les options
+    let optionsPrice = 0;
+    if (options) {
+      if (options.insurance) optionsPrice += totalDays * 15; // 15€/jour
+      if (options.gps) optionsPrice += totalDays * 8; // 8€/jour
+      if (options.childSeat) optionsPrice += 25; // 25€ fixe
+      if (options.additionalDriver) optionsPrice += totalDays * 10; // 10€/jour
+      if (options.unlimitedMileage) optionsPrice += totalDays * 12; // 12€/jour
+      if (options.delivery) optionsPrice += 50; // 50€ fixe
+      if (options.pickup) optionsPrice += 50; // 50€ fixe
+      if (options.setup) optionsPrice += 40; // 40€ fixe
+             if (options.insurance) optionsPrice += 50; // 50€ fixe
+       if (options.packing) optionsPrice += 200; // 200€ fixe
+       if (options.unpacking) optionsPrice += 150; // 150€ fixe
+       if (options.furniture) optionsPrice += 100; // 100€ fixe
+       if (options.delivery) optionsPrice += 80; // 80€ fixe
+       if (options.setup) optionsPrice += 120; // 120€ fixe
+       if (options.movingKit) optionsPrice += 75; // 75€ fixe (kit physique)
+    }
+    
+    const totalAmount = subtotal + optionsPrice;
 
     // Créer la réservation
     const reservation = new Reservation({
       user: req.user.id,
-      vehicle: vehicleId,
-      service: serviceId,
+      vehicle: vehicleId || null,
+      service: serviceId || null,
       startDate,
       endDate,
       pickupLocation,
@@ -142,9 +185,9 @@ router.post('/', [
         dailyRate,
         totalDays,
         subtotal,
-        insurance,
-        deposit: vehicle.pricing.deposit,
+        optionsPrice,
         totalAmount,
+        deposit,
         discount: 0
       },
       payment: {

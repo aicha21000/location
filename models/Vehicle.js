@@ -193,7 +193,7 @@ const vehicleSchema = new mongoose.Schema({
 // Index pour améliorer les performances
 vehicleSchema.index({ category: 1, type: 1 });
 vehicleSchema.index({ isAvailable: 1, isActive: 1 });
-vehicleSchema.index({ location: '2dsphere' });
+// Index géospatial supprimé car la structure de localisation n'est pas GeoJSON
 
 // Méthode pour vérifier la disponibilité
 vehicleSchema.methods.isAvailableForDates = function(startDate, endDate) {

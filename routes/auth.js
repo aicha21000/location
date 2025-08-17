@@ -15,12 +15,12 @@ router.post('/register', [
   body('email').isEmail().normalizeEmail().withMessage('Email invalide'),
   body('password').isLength({ min: 6 }).withMessage('Le mot de passe doit contenir au moins 6 caractères'),
   body('phone').matches(/^(\+33|0)[1-9](\d{8})$/).withMessage('Numéro de téléphone invalide'),
-  body('dateOfBirth').isISO8601().withMessage('Date de naissance invalide'),
-  body('drivingLicense.number').notEmpty().withMessage('Numéro de permis requis'),
-  body('drivingLicense.expiryDate').isISO8601().withMessage('Date d\'expiration invalide'),
-  body('address.street').notEmpty().withMessage('Adresse requise'),
-  body('address.city').notEmpty().withMessage('Ville requise'),
-  body('address.postalCode').notEmpty().withMessage('Code postal requis')
+  body('dateOfBirth').isISO8601().optional().withMessage('Date de naissance invalide'),
+  body('drivingLicense.number').notEmpty().optional().withMessage('Numéro de permis requis'),
+  body('drivingLicense.expiryDate').isISO8601().optional().withMessage('Date d\'expiration invalide'),
+  body('address.street').notEmpty().optional().withMessage('Adresse requise'),
+  body('address.city').notEmpty().optional().withMessage('Ville requise'),
+  body('address.postalCode').notEmpty().optional().withMessage('Code postal requis')
 ], async (req, res) => {
   try {
     // Vérification des erreurs de validation
@@ -120,8 +120,7 @@ router.post('/login', [
     }
 
     // Mettre à jour la dernière connexion
-    user.lastLogin = new Date();
-    await user.save();
+    await User.updateOne({ _id: user._id }, { $set: { lastLogin: new Date() } });
 
     // Générer le token JWT
     const payload = {

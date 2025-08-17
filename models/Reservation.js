@@ -9,7 +9,7 @@ const reservationSchema = new mongoose.Schema({
   vehicle: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Vehicle',
-    required: [true, 'Le véhicule est requis']
+    required: false
   },
   service: {
     type: mongoose.Schema.Types.ObjectId,
@@ -85,7 +85,7 @@ const reservationSchema = new mongoose.Schema({
       type: Number,
       required: true
     },
-    insurance: {
+    optionsPrice: {
       type: Number,
       default: 0
     },
@@ -119,10 +119,14 @@ const reservationSchema = new mongoose.Schema({
       type: Boolean,
       default: false
     },
-    unlimitedMileage: {
-      type: Boolean,
-      default: false
-    }
+         unlimitedMileage: {
+       type: Boolean,
+       default: false
+     },
+     movingKit: {
+       type: Boolean,
+       default: false
+     }
   },
   status: {
     type: String,
@@ -189,10 +193,36 @@ const reservationSchema = new mongoose.Schema({
       default: 0
     }
   },
-  isActive: {
-    type: Boolean,
-    default: true
-  }
+     isActive: {
+     type: Boolean,
+     default: true
+   },
+   movingKitDelivery: {
+     date: {
+       type: Date,
+       default: null
+     },
+     time: {
+       type: String,
+       default: null
+     },
+     address: {
+       type: String,
+       default: null
+     },
+     city: {
+       type: String,
+       default: null
+     },
+     postalCode: {
+       type: String,
+       default: null
+     },
+     instructions: {
+       type: String,
+       default: null
+     }
+   }
 }, {
   timestamps: true
 });
@@ -204,18 +234,38 @@ reservationSchema.index({ status: 1, createdAt: -1 });
 
 // Middleware pour calculer automatiquement les prix
 reservationSchema.pre('save', function(next) {
-  if (this.isModified('startDate') || this.isModified('endDate') || this.isModified('pricing.dailyRate')) {
+  if (this.isModified('startDate') || this.isModified('endDate') || this.isModified('pricing.dailyRate') || this.isModified('options')) {
     const days = Math.ceil((this.endDate - this.startDate) / (1000 * 60 * 60 * 24));
     this.pricing.totalDays = days;
-    this.pricing.subtotal = days * this.pricing.dailyRate;
     
-    // Calcul de l'assurance si activée
-    if (this.options.insurance) {
-      this.pricing.insurance = days * 15; // 15€ par jour d'assurance
+    // Calculer le sous-total selon le type de réservation
+    if (this.pricing.dailyRate) {
+      this.pricing.subtotal = days * this.pricing.dailyRate;
     }
     
+    // Calcul de toutes les options
+    let optionsPrice = 0;
+    if (this.options.insurance) optionsPrice += days * 15; // 15€/jour
+    if (this.options.gps) optionsPrice += days * 8; // 8€/jour
+    if (this.options.childSeat) optionsPrice += 25; // 25€ fixe
+    if (this.options.additionalDriver) optionsPrice += days * 10; // 10€/jour
+    if (this.options.unlimitedMileage) optionsPrice += days * 12; // 12€/jour
+    if (this.options.delivery) optionsPrice += 50; // 50€ fixe
+    if (this.options.pickup) optionsPrice += 50; // 50€ fixe
+    if (this.options.setup) optionsPrice += 40; // 40€ fixe
+         if (this.options.insurance) optionsPrice += 50; // 50€ fixe
+     if (this.options.packing) optionsPrice += 200; // 200€ fixe
+     if (this.options.unpacking) optionsPrice += 150; // 150€ fixe
+     if (this.options.furniture) optionsPrice += 100; // 100€ fixe
+     if (this.options.delivery) optionsPrice += 80; // 80€ fixe
+     if (this.options.setup) optionsPrice += 120; // 120€ fixe
+     if (this.options.movingKit) optionsPrice += 75; // 75€ fixe (kit physique)
+    
+    // Sauvegarder le prix des options
+    this.pricing.optionsPrice = optionsPrice;
+    
     // Calcul du total
-    this.pricing.totalAmount = this.pricing.subtotal + this.pricing.insurance - this.pricing.discount;
+    this.pricing.totalAmount = this.pricing.subtotal + optionsPrice - this.pricing.discount;
   }
   next();
 });

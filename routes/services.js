@@ -72,10 +72,47 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// @route   POST /api/services
+// @route   GET /api/admin/services
+// @desc    Récupérer tous les services (admin)
+// @access  Private (Admin)
+router.get('/admin/services', auth, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Accès refusé' });
+    }
+
+    const services = await Service.find({}).sort({ createdAt: -1 });
+    res.json(services);
+  } catch (error) {
+    console.error('Erreur lors de la récupération des services:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+// @route   GET /api/admin/services/:id
+// @desc    Récupérer un service par ID (admin)
+// @access  Private (Admin)
+router.get('/admin/services/:id', auth, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Accès refusé' });
+    }
+
+    const service = await Service.findById(req.params.id);
+    if (!service) {
+      return res.status(404).json({ message: 'Service non trouvé' });
+    }
+    res.json(service);
+  } catch (error) {
+    console.error('Erreur lors de la récupération du service:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+// @route   POST /api/admin/services
 // @desc    Créer un nouveau service
 // @access  Private (Admin)
-router.post('/', [
+router.post('/admin/services', [
   auth,
   body('name').notEmpty().withMessage('Le nom est requis'),
   body('category').isIn(['demenagement', 'remorque', 'materiel', 'kit', 'livraison']).withMessage('Catégorie invalide'),
@@ -105,10 +142,10 @@ router.post('/', [
   }
 });
 
-// @route   PUT /api/services/:id
+// @route   PUT /api/admin/services/:id
 // @desc    Mettre à jour un service
 // @access  Private (Admin)
-router.put('/:id', [
+router.put('/admin/services/:id', [
   auth,
   body('name').optional().notEmpty().withMessage('Le nom ne peut pas être vide'),
   body('category').optional().isIn(['demenagement', 'remorque', 'materiel', 'kit', 'livraison']).withMessage('Catégorie invalide'),
@@ -143,10 +180,10 @@ router.put('/:id', [
   }
 });
 
-// @route   DELETE /api/services/:id
+// @route   DELETE /api/admin/services/:id
 // @desc    Supprimer un service
 // @access  Private (Admin)
-router.delete('/:id', auth, async (req, res) => {
+router.delete('/admin/services/:id', auth, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Accès refusé' });
@@ -186,6 +223,37 @@ router.get('/types', async (req, res) => {
     res.json(types);
   } catch (error) {
     console.error('Erreur lors de la récupération des types:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+// @route   PATCH /api/admin/services/:id/status
+// @desc    Activer/désactiver un service
+// @access  Private (Admin)
+router.patch('/admin/services/:id/status', auth, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Accès refusé' });
+    }
+
+    const { isActive } = req.body;
+    if (typeof isActive !== 'boolean') {
+      return res.status(400).json({ message: 'Le statut doit être un booléen' });
+    }
+
+    const service = await Service.findByIdAndUpdate(
+      req.params.id,
+      { isActive },
+      { new: true, runValidators: true }
+    );
+
+    if (!service) {
+      return res.status(404).json({ message: 'Service non trouvé' });
+    }
+
+    res.json(service);
+  } catch (error) {
+    console.error('Erreur lors de la mise à jour du statut:', error);
     res.status(500).json({ message: 'Erreur serveur' });
   }
 });

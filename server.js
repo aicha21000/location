@@ -7,6 +7,12 @@ const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
+// Définir les variables d'environnement par défaut si elles n'existent pas
+if (!process.env.JWT_SECRET) {
+  process.env.JWT_SECRET = 'location-voitures-jwt-secret-2024-super-securise';
+  console.log('⚠️  JWT_SECRET non défini, utilisation de la valeur par défaut');
+}
+
 const app = express();
 
 // Middleware de sécurité
@@ -20,19 +26,37 @@ app.use(cors({
   credentials: true
 }));
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limite chaque IP à 100 requêtes par fenêtre
-});
-app.use('/api/', limiter);
-
-// Body parser
+// Body parser - DOIT être avant les routes !
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: process.env.NODE_ENV === 'production' ? 100 : 1000, // Plus permissif en développement
+  message: {
+    error: 'Trop de requêtes, veuillez réessayer plus tard',
+    retryAfter: Math.ceil(15 * 60 / 1000) // 15 minutes en secondes
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Appliquer le rate limiting à toutes les routes API sauf l'auth
+app.use('/api/', limiter);
+
+// Rate limiting plus permissif pour l'authentification
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: process.env.NODE_ENV === 'production' ? 20 : 100, // Plus permissif en développement
+  message: {
+    error: 'Trop de tentatives de connexion, veuillez réessayer plus tard',
+    retryAfter: Math.ceil(15 * 60 / 1000)
+  }
+});
+
 // Routes
-app.use('/api/auth', require('./routes/auth'));
+app.use('/api/auth', authLimiter, require('./routes/auth'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/vehicles', require('./routes/vehicles'));
 app.use('/api/services', require('./routes/services'));
@@ -40,6 +64,8 @@ app.use('/api/reservations', require('./routes/reservations'));
 app.use('/api/payments', require('./routes/payments'));
 app.use('/api/documents', require('./routes/documents'));
 app.use('/api/admin', require('./routes/admin'));
+app.use('/api/product-orders', require('./routes/productOrders'));
+app.use('/api/products', require('./routes/products'));
 
 // Health check
 app.get('/api/health', (req, res) => {
